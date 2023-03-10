@@ -12,7 +12,7 @@
 #' @param M_format format of files representing the accessible area (M) for the
 #' species. Names of M files must match the ones for occurrence files in
 #' \code{occ_folder}. Format options are: "shp", "gpkg", or any of the options
-#' in \code{\link[raster]{writeFormats}} (e.g., "GTiff").
+#' supported by \code{\link[terra]{rast}} (e.g., "tif" or "asc").
 #' @param occ_folder (character) name of the folder containing csv files of
 #' occurrence data for all species. Names of csv files must match the ones of M
 #' files in \code{M_folder}.
@@ -22,8 +22,9 @@
 #' values of latitude.
 #' @param var_folder (character) name of the folder containing layers to
 #' represent environmental variables.
-#' @param var_format format of layers to represent environmental variables. See
-#' options in \code{\link[raster]{writeFormats}} (e.g., "GTiff").
+#' @param var_format format of layers to represent environmental variables.
+#' Format options are all the ones supported by \code{\link[terra]{rast}}
+#' (e.g., "tif" or "asc").
 #' @param round (logical) whether or not to round the values of one or more
 #' variables after multiplying them times the value in \code{multiplication_factor}.
 #' Default = FALSE. See details.
@@ -39,9 +40,10 @@
 #' be written.
 #' @param overwrite (logical) whether or not to overwrite existing results in
 #' \code{output_directory}. Default = FALSE.
+#' @param verbose (logical) whether messages should be printed. Default = TRUE.
 #'
 #' @details
-#' Coordinates in csv files in \code{occ_folder}, SpatialPolygons*-like files in
+#' Coordinates in csv files in \code{occ_folder}, SpatVector-like files in
 #' \code{M_folder}, and raster layers in \code{var_folder} must coincide in the
 #' geographic projection in which they are represented. WGS84 with no planar
 #' projection is recommended.
@@ -51,7 +53,8 @@
 #' a hard task, but also a very important one, because it allows identifying
 #' uncertainties about the ability of a species to maintain populations in
 #' certain environmental conditions. For further details on this topic, see
-#' Barve et al. (2011) in \url{https://doi.org/10.1016/j.ecolmodel.2011.02.011}.
+#' Barve et al. (2011) <doi:10.1016/j.ecolmodel.2011.02.011>
+#' and Machado-Stredel et al. (2021) <doi:10.21425/F5FBG48814>.
 #'
 #' Rounding variables may be useful when multiple variables are considered and
 #' the values of some or all of them are too small (e.g., when using principal
@@ -74,46 +77,80 @@
 #'
 #' @importFrom stats na.omit median
 #' @importFrom utils write.csv read.csv
-#' @importFrom raster extract crop mask nlayers raster stack
-#' @importFrom rgdal readOGR
+#' @importFrom terra extract crop nlyr rast vect
 #'
 #' @export
 #'
 #' @usage
 #' stats_evalues(stats = c("median", "range"), M_folder, M_format, occ_folder,
-#'   longitude, latitude, var_folder, var_format, round = FALSE, round_names,
-#'   multiplication_factor = 1, percentage_out = 0, save = FALSE,
-#'   output_directory, overwrite = FALSE)
+#'               longitude, latitude, var_folder, var_format, round = FALSE,
+#'               round_names, multiplication_factor = 1, percentage_out = 0,
+#'               save = FALSE, output_directory, overwrite = FALSE,
+#'               verbose = TRUE)
 #'
 #' @examples
-#' # example of how to define arguments, check argument descriptions above
-#' \donttest{
-#' stats <- stats_evalues(stats = c("median", "range"), M_folder = "Folder_with_Ms",
-#'                        M_format = "shp", occ_folder = "Folder_with_occs",
-#'                        longitude = "lon_column", latitude = "lat_column",
-#'                        var_folder = "Folder_with_vars", var_format = "GTiff",
-#'                        percentage_out = 0)
-#' }
+#' # preparing data and directories for examples
+#' ## directories
+#' tempdir <- file.path(tempdir(), "nevol_test")
+#' dir.create(tempdir)
+#'
+#' cvariables <- paste0(tempdir, "/variables")
+#' dir.create(cvariables)
+#'
+#' records <- paste0(tempdir, "/records")
+#' dir.create(records)
+#'
+#' m_areas <- paste0(tempdir, "/M_areas")
+#' dir.create(m_areas)
+#'
+#' ## data
+#' data("occ_list", package = "nichevol")
+#'
+#' temp <- system.file("extdata", "temp.tif", package = "nichevol")
+#'
+#' m_files <- list.files(system.file("extdata", package = "nichevol"),
+#'                       pattern = "m\\d.gpkg", full.names = TRUE)
+#'
+#' ## writing data in temporal directories
+#' spnames <- sapply(occ_list, function (x) as.character(x[1, 1]))
+#' ocnames <-  paste0(records, "/", spnames, ".csv")
+#'
+#' occs <- lapply(1:length(spnames), function (x) {
+#'   write.csv(occ_list[[x]], ocnames[x], row.names = FALSE)
+#' })
+#'
+#' to_replace <- paste0(system.file("extdata", package = "nichevol"), "/")
+#'
+#' otemp <- gsub(to_replace, "", temp)
+#' file.copy(from = temp, to = paste0(cvariables, "/", otemp))
+#'
+#' file.copy(from = m_files, to = paste0(m_areas, "/", spnames, ".gpkg"))
+#' stats <- stats_evalues(stats = c("median", "range"), M_folder = m_areas,
+#'                        M_format = "gpkg", occ_folder = records,
+#'                        longitude = "x", latitude = "y",
+#'                        var_folder = cvariables, var_format = "tif",
+#'                        percentage_out = 5)
 
 stats_evalues <- function(stats = c("median", "range"), M_folder, M_format,
                           occ_folder, longitude, latitude, var_folder,
                           var_format, round = FALSE, round_names,
                           multiplication_factor = 1, percentage_out = 0,
-                          save = FALSE, output_directory, overwrite = FALSE) {
+                          save = FALSE, output_directory, overwrite = FALSE,
+                          verbose = TRUE) {
   # checking for potential errors
-  if (missing(M_folder)) {stop("Argument M_folder is missing.")}
-  if (missing(M_format)) {stop("Argument M_format is missing.")}
-  if (missing(occ_folder)) {stop("Argument occ_folder is missing.")}
-  if (missing(longitude)) {stop("Argument longitude is missing.")}
-  if (missing(latitude)) {stop("Argument latitude is missing.")}
-  if (missing(var_folder)) {stop("Argument var_folder is missing.")}
-  if (missing(var_format)) {stop("Argument var_format is missing.")}
+  if (missing(M_folder)) {stop("Argument 'M_folder' is missing.")}
+  if (missing(M_format)) {stop("Argument 'M_format' is missing.")}
+  if (missing(occ_folder)) {stop("Argument 'occ_folder' is missing.")}
+  if (missing(longitude)) {stop("Argument 'longitude' is missing.")}
+  if (missing(latitude)) {stop("Argument 'latitude' is missing.")}
+  if (missing(var_folder)) {stop("Argument 'var_folder' is missing.")}
+  if (missing(var_format)) {stop("Argument 'var_format' is missing.")}
   if (save == TRUE) {
     if (missing(output_directory)) {
       stop("Argument 'output_directory' is missing.")
     } else {
       if (overwrite == FALSE & dir.exists(output_directory)) {
-        stop("'output_directory' already exists, to replace it use overwrite = TRUE.")
+        stop("'output_directory' already exists, to replace it use 'overwrite' = TRUE.")
       }
       if (overwrite == TRUE & dir.exists(output_directory)) {
         unlink(x = output_directory, recursive = TRUE, force = TRUE)
@@ -122,69 +159,70 @@ stats_evalues <- function(stats = c("median", "range"), M_folder, M_format,
   }
 
   # formats and data to start
-  message("\nPreparing data, please wait...\n")
-  if (M_format %in% c("shp", "gpkg")) {
-    if (M_format == "shp") {
-      M_patt <- ".shp$"
-      subs <- ".shp"
-      mlist <- gsub(subs, "", list.files(path = M_folder, pattern = M_patt))
-      spnames <- mlist
-    } else {
-      M_patt <- ".gpkg$"
-      subs <- ".gpkg"
-      mlist <- list.files(path = M_folder, pattern = M_patt)
-      spnames <- gsub(subs, "", mlist)
-    }
-  } else {
-    M_patt <- paste0(rformat_type(var_format), "$")
-    subs <- rformat_type(var_format)
-    mlist <- list.files(path = M_folder, pattern = M_patt, full.names = TRUE)
-    spnames <- gsub(subs, "", list.files(path = M_folder, pattern = M_patt))
+  if (verbose == TRUE) {
+    message("\nPreparing data, please wait...\n")
   }
-  v_patt <- paste0(rformat_type(var_format), "$")
+
+  ## records
   occlist <- list.files(path = occ_folder, pattern = ".csv$", full.names = TRUE)
-  variables <- raster::stack(list.files(path = var_folder,
-                                        pattern = v_patt, full.names = TRUE))
+
+  ## M areas
+  M_patt <- paste0(M_format, "$")
+  mlist <- list.files(path = M_folder, pattern = M_patt, full.names = TRUE)
+
+  ## species names
+  subs <- paste0(".", M_format)
+  spnames <- gsub(subs, "", list.files(path = M_folder, pattern = M_patt))
+
+  ## variables
+  v_patt <- paste0(var_format, "$")
+  variables <- terra::rast(list.files(path = var_folder, pattern = v_patt,
+                                      full.names = TRUE))
 
   var_names <- names(variables)
   if (round == TRUE) {
     rounds <- round(variables[[round_names]] * multiplication_factor)
     noround <- var_names[!var_names %in% round_names]
-    variables <- raster::stack(variables[[noround]], rounds)
+    variables <- c(variables[[noround]], rounds)
   }
 
   # directory for results
   if (save == TRUE) {dir.create(output_directory)}
-  message("Preparing statistics from environmental layers and species data:")
-  n_vars <- raster::nlayers(variables)
+  if (verbose == TRUE) {
+    message("Preparing statistics from environmental layers and species data:")
+  }
+
+  n_vars <- terra::nlyr(variables)
+
   var_stats <- lapply(1:n_vars, function(i) {
     sp_stats <- lapply(1:length(occlist), function(j) {
-      ## data
+      ## M
       if (M_format %in% c("shp", "gpkg")) {
-        if (M_format == "shp") {
-          M <- rgdal::readOGR(dsn = M_folder, layer = mlist[j],
-                              verbose = FALSE)
-        } else {
-          M <- rgdal::readOGR(paste0(M_folder, "/",
-                                     mlist[j]), spnames[j], verbose = FALSE)
-        }
+        M <- terra::vect(mlist[j])
       } else {
-        M <- raster::raster(mlist[j])
+        M <- terra::rast(mlist[j])
       }
+
+      ## occurrences
       occ <- read.csv(occlist[j])
 
-      ## preparing e values
-      mvar <- raster::mask(raster::crop(variables[[i]], M), M)
-      mval <- na.omit(mvar[])
+      # processing
+      ## get values of variables in M
+      mvar <- terra::crop(variables[[i]], M, mask = TRUE)
+      mval <- na.omit(mvar[][, 1])
+
       if (percentage_out > 0) {
         medians <- median(mval)
         df_layer <- abs(mval - medians)
         names(df_layer) <- mval
-        limit <- floor((100 - percentage_out) * length(df_layer)/100)
+        limit <- floor((100 - percentage_out) * length(df_layer) / 100)
         df_layer <- sort(df_layer)[1:limit]
         mval <- as.numeric(names(df_layer))
       }
-      occval <- na.omit(raster::extract(mvar, occ[, c(longitude, latitude)]))
+
+      ## occurrences
+      occval <- na.omit(terra::extract(mvar, as.matrix(occ[, c(longitude,
+                                                               latitude)]))[, 1])
 
       ## obtaining statistics
       if (length(stats) > 1) {
@@ -207,9 +245,10 @@ stats_evalues <- function(stats = c("median", "range"), M_folder, M_format,
     })
 
     # preparing tables with results
-    m_table <- data.frame(Species = mlist,
+    spnames <- gsub("_", " ", spnames)
+    m_table <- data.frame(Species = spnames,
                           do.call(rbind, lapply(sp_stats, function(x) {x[[1]]})))
-    o_table <- data.frame(Species = mlist,
+    o_table <- data.frame(Species = spnames,
                           do.call(rbind, lapply(sp_stats, function(x) {x[[2]]})))
 
     # write table
@@ -222,7 +261,9 @@ stats_evalues <- function(stats = c("median", "range"), M_folder, M_format,
                 row.names = FALSE)
     }
 
-    message(i, " of ", n_vars, " variables processed")
+    if (verbose == TRUE) {
+      message(i, " of ", n_vars, " variables processed")
+    }
 
     return(list(M_stats = m_table, Occurrence_stats = o_table))
   })

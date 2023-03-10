@@ -5,9 +5,10 @@
 \title{Histograms of environmental conditions in M and for occurrences}
 \usage{
 histograms_env(M_folder, M_format, occ_folder, longitude, latitude,
-  var_folder, var_format, CL_lines = c(95, 99), col = NULL,
-  round = FALSE, round_names = NULL, multiplication_factor = 1,
-  save_ranges = FALSE, output_directory, overwrite = FALSE)
+               var_folder, var_format, CL_lines = c(95, 99), col = NULL,
+               round = FALSE, round_names = NULL, multiplication_factor = 1,
+               save_ranges = FALSE, output_directory, overwrite = FALSE,
+               verbose = TRUE)
 }
 \arguments{
 \item{M_folder}{(character) name of the folder containing files representing
@@ -16,7 +17,7 @@ the accessible area (M) for all species to be analyzed. See details.}
 \item{M_format}{format of files representing the accessible area (M) for the
 species. Names of M files must match the ones for occurrence files in
 \code{occ_folder}. Format options are: "shp", "gpkg", or any of the options
-in \code{\link[raster]{writeFormats}} (e.g., "GTiff").}
+supported by \code{\link[terra]{rast}} (e.g., "tif" or "asc").}
 
 \item{occ_folder}{(character) name of the folder containing csv files of
 occurrence data for all species. Names of csv files must match the ones of M
@@ -31,8 +32,9 @@ values of latitude.}
 \item{var_folder}{(character) name of the folder containing layers to
 represent environmental variables.}
 
-\item{var_format}{format of layers to represent environmental variables. See
-options in \code{\link[raster]{writeFormats}} (e.g., "GTiff").}
+\item{var_format}{format of layers to represent environmental variables.
+Format options are all the ones supported by \code{\link[terra]{rast}}
+(e.g., "tif" or "asc").}
 
 \item{CL_lines}{(numeric) confidence limits of environmental values in M to
 be plotted as lines in the histograms. See details. Default = c(95, 99).}
@@ -54,11 +56,13 @@ variables defined in \code{round_names}. Default = 1.}
 ranges considering the whole set of values and confidence limits defined in
 \code{CL_lines}. Default = FALSE.}
 
-\item{output_directory}{(character) name of the folder in which results will be
-written.}
+\item{output_directory}{(character) name of the folder in which results will
+be written.}
 
 \item{overwrite}{(logical) whether or not to overwrite existing results in
 \code{output_directory}. Default = FALSE.}
+
+\item{verbose}{(logical) whether messages should be printed. Default = TRUE.}
 }
 \value{
 A list of data.frames containing intervals of environmental values in species
@@ -77,7 +81,7 @@ read directly from a local directory, and can be applied to various species
 and multiple variables.
 }
 \details{
-Coordinates in csv files in \code{occ_folder}, SpatialPolygons*-like files in
+Coordinates in csv files in \code{occ_folder}, SpatVector-like files in
 \code{M_folder}, and raster layers in \code{var_folder} must coincide in the
 geographic projection in which they are represented. WGS84 with no planar
 projection is recommended.
@@ -87,7 +91,8 @@ accessible for a species for relevant periods of time. Defining M is usually
 a hard task, but also a very important one, because it allows identifying
 uncertainties about the ability of a species to maintain populations under
 certain environmental conditions. For further details on this topic, see
-Barve et al. (2011) in \url{https://doi.org/10.1016/j.ecolmodel.2011.02.011}.
+Barve et al. (2011) \url{doi:10.1016/j.ecolmodel.2011.02.011}
+and Machado-Stredel et al. (2021) \url{doi:10.21425/F5FBG48814}.
 
 Rounding variables may be useful when multiple variables are considered and
 the values of some or all of them are too small (e.g., when using principal
@@ -95,12 +100,48 @@ components). To round specific variables arguments \code{round},
 \code{round_names}, and \code{multiplication_factor}, must be used accordingly.
 }
 \examples{
-# example of how to define arguments, check argument descriptions above
-\donttest{
-hists <- histograms_env(M_folder = "Folder_with_Ms", M_format = "shp",
-                        occ_folder = "Folder_with_occs", longitude = "lon_column",
-                        latitude = "lat_column", var_folder = "Folder_with_vars",
-                        var_format = "GTiff",
-                        output_directory = file.path(tempdir(), "Hist_env"))
-}
+# preparing data and directories for examples
+## directories
+tempdir <- file.path(tempdir(), "nevol_test")
+dir.create(tempdir)
+
+cvariables <- paste0(tempdir, "/variables")
+dir.create(cvariables)
+
+records <- paste0(tempdir, "/records")
+dir.create(records)
+
+m_areas <- paste0(tempdir, "/M_areas")
+dir.create(m_areas)
+
+histdir <- paste0(tempdir, "/Hists")
+
+## data
+data("occ_list", package = "nichevol")
+
+temp <- system.file("extdata", "temp.tif", package = "nichevol")
+
+m_files <- list.files(system.file("extdata", package = "nichevol"),
+                      pattern = "m\\\\d.gpkg", full.names = TRUE)
+
+## writing data in temporal directories
+spnames <- sapply(occ_list, function (x) as.character(x[1, 1]))
+ocnames <-  paste0(records, "/", spnames, ".csv")
+
+occs <- lapply(1:length(spnames), function (x) {
+  write.csv(occ_list[[x]], ocnames[x], row.names = FALSE)
+})
+
+to_replace <- paste0(system.file("extdata", package = "nichevol"), "/")
+
+otemp <- gsub(to_replace, "", temp)
+file.copy(from = temp, to = paste0(cvariables, "/", otemp))
+
+file.copy(from = m_files, to = paste0(m_areas, "/", spnames, ".gpkg"))
+
+# running analysis to produce plots
+hists <- histograms_env(M_folder = m_areas, M_format = "gpkg",
+                        occ_folder = records, longitude = "x",
+                        latitude = "y", var_folder = cvariables,
+                        var_format = "tif", output_directory = histdir)
 }

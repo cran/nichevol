@@ -1,0 +1,24 @@
+citHeader("To cite nichevol in publications use:")
+
+bibentry(
+     bibtype = "Article",
+     title   = "Acknowledging uncertainty in evolutionary reconstructions of ecological niches",
+     author  = c(person("Hannah L.", "Owens"),
+                 person("Vivian", "Ribeiro"),
+                 person("Erin E.", "Saupe"),
+                 person("Marlon E.", "Cobos"),
+                 person("Peter A.", "Hosner"),
+                 person("Jacob C.", "Cooper"),
+                 person("Abdallah M.", "Samy"),
+                 person("Vijay", "Barve"),
+                 person("Narayani", "Barve"),
+                 person("Carlos J.", "Muñoz-R"),
+                 person("A. Townsend", "Peterson")),
+     journal = "Ecology and Evolution",
+     year    = "2020",
+     volume  = "10",
+     number  = "14",
+     pages   = "6967–6977",
+     url     = "https://doi.org/10.1002/ece3.6359",
+     doi     = "10.1002/ece3.6359",
+)

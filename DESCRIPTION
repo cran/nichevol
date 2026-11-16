@@ -2,7 +2,7 @@ Package: nichevol
 Type: Package
 Title: Tools for Ecological Niche Evolution Assessment Considering
         Uncertainty
-Version: 0.1.20
+Version: 0.1.21
 Authors@R: c(
     person("Marlon E.", "Cobos", email = "manubio13@gmail.com", role = c("aut","cre")),
     person("Hannah L.", "Owens", email = "hannah.owens@gmail.com", role = "aut"),
@@ -11,7 +11,7 @@ Author: Marlon E. Cobos [aut, cre],
   Hannah L. Owens [aut],
   A. Townsend Peterson [aut]
 Maintainer: Marlon E. Cobos <manubio13@gmail.com>
-Date: 2023-03-09
+Date: 2026-11-15
 Description: A collection of tools that allow users to perform critical steps 
     in the process of assessing ecological niche evolution over phylogenies, with
     uncertainty incorporated explicitly in reconstructions. The method proposed
@@ -34,16 +34,15 @@ Description: A collection of tools that allow users to perform critical steps
     Cobos et al. (2021) <doi:10.1111/jav.02868>.
 URL: https://github.com/marlonecobos/nichevol
 BugReports: https://github.com/marlonecobos/nichevol/issues
-Imports: castor (>= 1.4), geiger (>= 2.0), graphics (>= 3.6), grDevices
-        (>= 3.6), stringr (>= 1.4), stats (>= 3.6), terra (>= 1.6),
-        utils (>= 3.6)
-Suggests: knitr(>= 1.25), phytools (>= 0.6)
-Depends: ape (>= 5.3), R (>= 3.5.0)
+Imports: castor (>= 1.4), geiger (>= 2.0), graphics, grDevices, stringr
+        (>= 1.4), stats, terra (>= 1.6), utils
+Suggests: knitr, phytools
+Depends: ape, R (>= 3.5.0)
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.1.2
+Config/roxygen2/version: 8.0.0
 NeedsCompilation: no
-Packaged: 2023-03-10 19:28:24 UTC; marlon
+Packaged: 2026-11-15 23:37:05 UTC; mec
 Repository: CRAN
-Date/Publication: 2023-03-10 23:20:02 UTC
+Date/Publication: 2026-11-16 00:00:02 UTC
